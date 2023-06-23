@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit MyModel</title>
+</head>
+<body>
+    <h1>Edit MyModel</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Save</button>
+        <a href="{% url 'mymodel-detail' object.id %}">Cancel</a>
+    </form>
+</body>
+</html>
