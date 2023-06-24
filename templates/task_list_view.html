@@ -10,10 +10,23 @@
     <nav>
         <ul>
             <li><a href="{% url 'create-tasks' 'james' %}">New</a></li>
+            <li><a href="{% url 'create-tasks' 'james' %}">New</a></li>
         </ul>
     </nav>
+    {{context.sessionuser}}
     {% for tasks in tasks_obj %}
-        {{ tasks.title }}
+        <ul>
+            <li> {{ tasks.title }}
+                <ul>
+                    <li>{{tasks.description}}</li>
+                    <li>{{tasks.status}}</li>
+                    <li>{{tasks.due_date}}</li>
+                    <li>{{tasks.last_modified}}</li>
+                    <li>{{tasks.start_date}}</li>
+                    <li>{{tasks.user}}</li>
+                </ul>
+            </li>
+        </ul>
     {% empty %}
         There is no data
     {% endfor %}

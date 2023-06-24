@@ -7,11 +7,48 @@ from django.core.exceptions import ValidationError, FieldDoesNotExist
 
 TRACK_USER = "task_tracker_user"
 
-class UserCreateView(generic.CreateView):
+
+class UserView(generic.CreateView):
     template_name = "user.html"
     context_object_name = "useradd"
     fields = ['username']
     success_url = reverse_lazy('all_task', kwargs={'name':TRACK_USER})
+    model = User
+
+    def form_valid(self, request, *args, **kwargs):
+        print("This is making sure that the form valid function runs")
+        # Confirming that the user actually exists
+        try:
+            user = self.request.POST.get('username')
+            user_exists =  User.objects.filter(username=user).exists()
+            print(f"User exists in the database {user_exists}")
+            if user_exists:
+                self.request.session[TRACK_USER] = user
+                self.request.session.save()
+                return self.success_url
+        except FieldDoesNotExist as e:
+            print("This is the exception that occured.")
+            return self.success_url
+        except Exception as e:
+            request.add_error(None, f"Save Error: {str(e)}")
+            return self.form_invalid(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        form = self.get_form()
+        return self.form_valid(form)
+
+    def get_success_url(self):
+        return reverse_lazy('all_task', kwargs={'name':self.user_dict()})
+
+    def user_dict(self):
+        return self.request.POST.get('username')
+
+
+class UserCreateView(generic.CreateView):
+    template_name = "user.html"
+    context_object_name = "useradd"
+    fields = ['username']
+    success_url = reverse_lazy('user', kwargs={'name':TRACK_USER})
     model = User
 
     def form_valid(self, request, *args, **kwargs):
@@ -31,7 +68,7 @@ class UserCreateView(generic.CreateView):
             return self.form_invalid(request, *args, **kwargs)
 
     def get_success_url(self):
-        return reverse_lazy('all_task', kwargs={'name':self.user_dict()})
+        return reverse_lazy('user', kwargs={'name':self.user_dict()})
 
     def user_dict(self):
         return self.request.POST.get('username')
@@ -56,7 +93,7 @@ class UserDeleteView(generic.DeleteView):
 class TaskCreateView(generic.CreateView):
     template_name = "task_create_view.html"
     model = Task
-    success_url = reverse_lazy('all_task')
+    success_url = reverse_lazy('all_task', )
     fields = ['title', 'description', 'status', 'due_date']
 
     def dispatch(self, request, *arg, **kwargs):
@@ -84,11 +121,15 @@ class TaskCreateView(generic.CreateView):
         if not user:
             raise ValidationError(message)
 
+    def get_success_url(self, *args, **kwargs):
+        return reverse_lazy('all_task', kwargs={"name":self.request.session.get(TRACK_USER)})
+
 class TaskIndexView(generic.ListView):
     template_name = "task_list_view.html"
     context_object_name = "tasks_obj"
     paginate_by = 10
-    queryset = Task.objects.all()
+    model = Task
+    # queryset = Task.objects.filter(user=TaskIndexView.request.session.get(TRACK_USER))
 
     def dispatch(self, request, *arg, **kwargs):
         if TRACK_USER not in request.session:
@@ -96,13 +137,23 @@ class TaskIndexView(generic.ListView):
 
         return super().dispatch(request, *arg, **kwargs)
 
+    # def queryset(self, *args, **kwargs):
+        # print(super().queryset(*args, **kwargs))
+        # return self.get_queryset(*args, **kwargs)
+
     def get_queryset(self, *args, **kwargs):
         queryset = super().get_queryset(*args, **kwargs)
-        if user := self.request.session.get(self.kwargs['name']):
+        print(self.kwargs)
+        if user := self.request.session.get(TRACK_USER):
             if user_exists := User.objects.filter(username=user).exists():
                 user = User.objects.get(username=user)
-                queryset = Task.objects.get(user=user)
+                queryset = Task.objects.filter(user=user)
         return queryset
+
+    def get_context_data(self, *args, **kwargs):
+        context = super().get_context_data(*args, **kwargs)
+        context["sessionuser"] = self.request.session.get(TRACK_USER)
+        return context
 
 class TaskDetailView(generic.DetailView):
     template_name = "task_detailed_view.html"
@@ -151,4 +202,4 @@ class TaskUpdateView(generic.UpdateView):
         return context
 
 def home_page(request):
-    return render("home.html")
+    return render(request, "home.html")
